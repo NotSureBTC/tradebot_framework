@@ -303,7 +303,8 @@ def smart_order(side, qty, symbol=ordersym):
 			'side' : side,
 			'stopPx' : stopprice,
 			'orderQty' : qty,
-			'text' : ordertext
+			'text' : ordertext,
+			'execInst' : 'LastPrice'
 			},{
 			'clOrdLinkID' : ocoid,
 			'contingencyType' : 'OneCancelsTheOther',
