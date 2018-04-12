@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+from __future__ import print_function, division, unicode_literals
 from time import localtime
 from time import strftime
 from time import mktime

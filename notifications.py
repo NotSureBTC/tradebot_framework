@@ -1,5 +1,6 @@
 #!/usr/bin/python2
 
+from __future__ import print_function, division, unicode_literals
 from config import twilio_conf
 from twilio.rest import Client
 
