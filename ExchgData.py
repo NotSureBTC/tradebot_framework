@@ -267,10 +267,10 @@ class ExchgData:
 		askkeys = sorted(askkeys, reverse=True)
 
 		for key in askkeys:
-			print key, self.book['asks'][key]*-1
-		print '============================================'
+			print("%d\t%.2f" %  (key, self.book['asks'][key]*-1))
+		print('============================================')
 		for key in bidkeys:
-			print key, self.book['bids'][key]
+			print("%d\t%.2f" % (key, self.book['bids'][key]))
 
 	def get_book(self):
 		return self.book
