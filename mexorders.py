@@ -39,7 +39,7 @@ def market_order(side, qty, symbol = ordersym):
 			apitry = apitry+1
 
 	orders.append(orderdata)
-	if(orderdata['info']['cumQty'] != qty):
+	if(abs(orderdata['info']['cumQty']) != qty):
 		log.warning("Filled quantity %d does not match requested quantity of %d" % (orderdata['info']['cumQty'], qty))
 	return orderdata
 
