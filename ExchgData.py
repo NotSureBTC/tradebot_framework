@@ -92,7 +92,7 @@ class ExchgData:
 				apitry = apitry+1
 		self.debug("Fetched %d candles" % len(rawdata))
 		if(len(rawdata) < limit-1):
-			self.logger.warning("Asked for %d candles but received %d" % (limit, len(rawdata)))
+			self.logger.debug("Asked for %d candles but received %d" % (limit, len(rawdata)))
 		return rawdata
 
 	def preload_candles(self, tf, lookback = 100):
