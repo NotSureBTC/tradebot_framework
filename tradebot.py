@@ -45,8 +45,8 @@ tl.addHandler(tfh)
 tl.addHandler(tsh)
 tl.info("Trade Logger Initialized")
 
-def report_trade(action, ordersize, stacked):
-	report_string="action: %s\tordersize: %d\tstacked: %d" % (action, ordersize, stacked)
+def report_trade(action, ordersize, stacked, price):
+	report_string="action: %s\tordersize: %d\tstacked: %d\tprice: %.2f" % (action, ordersize, stacked, price)
 	tl.info(report_string)
 	log.debug(report_string)
 	send_sms(report_string)
@@ -82,17 +82,18 @@ while [ 1 ]:
 
 	shorts = mexorders.get_position_size('short')
 	longs = mexorders.get_position_size('long')
+	(bid, ask, last) = mexorders.get_bidasklast()
 	# if h3 kvo has flipped, flip positions
 	if hist_positive and not last_hist_positive:
 		mexorders.cancel_open_orders()
 		time.sleep(1)
 		mexorders.smart_order('Buy', shorts+config.ordersize)
-		report_trade("GOING LONG", shorts+config.ordersize, longs+config.ordersize)
+		report_trade("GOING LONG", shorts+config.ordersize, longs+config.ordersize, last)
 	elif not hist_positive and last_hist_positive:
 		mexorders.cancel_open_orders()
 		time.sleep(1)
 		mexorders.smart_order('Sell', longs+config.ordersize)
-		report_trade("GOING SHORT", longs+config.ordersize, shorts+config.ordersize)
+		report_trade("GOING SHORT", longs+config.ordersize, shorts+config.ordersize, last)
 
 	last_hist_positive = hist_positive
 
