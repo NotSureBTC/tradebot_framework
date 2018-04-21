@@ -10,13 +10,30 @@ import json
 from uuid import uuid4 as uid
 from config import bitmex_auth
 from config import bitmex_test
+from config import logfiles
 
 import logging
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
+dh = logging.FileHandler(logfiles['debug'])
+dh.setLevel(logging.DEBUG)
+ih = logging.FileHandler(logfiles['main'])
+ih.setLevel(logging.INFO)
+sh = logging.StreamHandler()
+sh.setLevel(logging.INFO)
+ffm = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
+cfm = logging.Formatter('[%(asctime)s] %(message)s')
+sh.setFormatter(cfm)
+dh.setFormatter(ffm)
+ih.setFormatter(ffm)
+
+log.addHandler(sh)
+log.addHandler(dh)
+log.addHandler(ih)
+log.info("Logger initialized")
 
 apitrylimit = 20
-apisleep = 8
+apisleep = 1
 
 bitmex = ccxt.bitmex(bitmex_auth)
 if(bitmex_test):
@@ -35,7 +52,7 @@ def market_order(side, qty, symbol = ordersym):
 		try:
 			orderdata = bitmex.create_order(symbol, 'market', side, qty)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry+1
 
 	orders.append(orderdata)
@@ -56,7 +73,7 @@ def get_positions():
 		try:
 			positions = bitmex.private_get_position()
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry + 1
 	return positions
 
@@ -67,7 +84,7 @@ def get_open_orders(symbol = ordersym):
 		try:
 			oorders = bitmex.fetch_open_orders(symbol)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry + 1
 	return oorders
 
@@ -91,7 +108,7 @@ def get_stoppx(order):
 
 def print_open_orders():
 	#logmesg = "Amount\tPrice\tSide\tType\tText\n"
-	orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s"
+	orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
 	price = 0.0
 	for order in get_open_orders():
 		if(order['type'] == 'stop'):
@@ -99,7 +116,7 @@ def print_open_orders():
 		else:
 			price = order['price']
 		#logmesg = logmesg+ str(order['amount'])+"\t"+str(price)+"\t"+order['side']+"\t"+order['type']+"\t"+order['info']['text']+"\n"
-		log.info(orderstring % ( order['amount'], price, order['side'], order['type']))
+		log.info(orderstring % ( order['amount'], price, order['side'], order['type'], order['info']['text']))
 
 def market_close_all(pos_symbol = possym, order_symbol = ordersym):
 	close_longs(pos_symbol, order_symbol)
@@ -130,7 +147,7 @@ def market_stop(side, qty, price, symbol = ordersym):
 		try:
 			orderdata = bitmex.create_order(symbol, 'Stop', side, qty, params={ 'stopPx': price, 'orderQty': qty })
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry+1
 	return orderdata
 
@@ -146,7 +163,7 @@ def market_stop_close(side, qty, price, symbol = ordersym, params=None):
 		try:
 			orderdata = bitmex.create_order(symbol, 'Stop', side, qty, params=myparams)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry+1
 	return orderdata
 
@@ -158,7 +175,7 @@ def limit_order(side, qty, price, params=None, symbol=ordersym):
 		try:
 			orderdata = bitmex.create_order(symbol, 'limit', side, qty, price, params)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			time.sleep(apisleep+2*apitry)
+			time.sleep(apisleep)
 			apitry = apitry+1
 	orders.append(orderdata)
 	return orderdata
@@ -177,20 +194,37 @@ def limit_buy(qty, price, symbol = ordersym, params=None):
 def limit_sell(qty, price, symbol = ordersym, params=None):
 	return limit_order('sell', qty, price, symbol, params=params)
 
+def cancel_order(orderid):
+	apitry = 0
+	response = None
+	while not response and apitry < apitrylimit:
+		try:
+			response = bitmex.cancel_order(orderid)
+		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
+			time.sleep(apisleep)
+			apitry = apitry+1
+	return response
+
 def cancel_open_orders(symbol = ordersym, text=None):
 	for order in get_open_orders():
 		if(order['symbol'] != symbol):
 			continue
 		if(text and not text in order['info']['text']):
 			continue
-		response = None
-		apitry = 0
-		while not response and apitry < apitrylimit:
-			try:
-				response = bitmex.cancel_order(order['id'])
-			except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-				time.sleep(apisleep+2*apitry)
-				apitry = apitry+1
+		return cancel_order(order['id'])
+
+def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=None):
+	neworder = None
+	apitry = 0
+	while not neworder and apitry < apitrylimit:
+		try:
+			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=params)
+		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
+			log.info("Failed to edit order, will try again shortly")
+			log.warning(error)
+			time.sleep(apisleep)
+			apitry = apitry+1
+	return neworder
 
 def create_or_update_order(ordertype, side, newamount, price=None, symbol=ordersym, params=None):
 	neworder = None
@@ -204,16 +238,16 @@ def create_or_update_order(ordertype, side, newamount, price=None, symbol=orders
 		if(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and not orderfound):
 			if(order['type'] == 'stop'):
 				params.update({'stopPx': price, 'execInst': 'Close' })
-				neworder = bitmex.edit_order(order['id'], symbol, ordertype, side, newamount, params=params) 
+				neworder = edit_order(order['id'], symbol, ordertype, side, newamount, params=params) 
 				orderfound = True
 				log.debug("Updating order %s" % order['id'])
 			else:
-				neworder = bitmex.edit_order(order['id'], symbol, ordertype, side, newamount, math.floor(price), params)
+				neworder = edit_order(order['id'], symbol, ordertype, side, newamount, math.floor(price), params)
 				orderfound = True
 				log.debug("Updating order %s" % order['id'])
 		elif(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and orderfound):
 			# once found one, close any others
-			bitmex.cancel_order(order['id'])
+			cancel_order(order['id'])
 			log.debug("Canceling order %d" % order['id'])
 	if(not orderfound):
 		if(ordertype == 'limit'):
@@ -276,7 +310,7 @@ def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
 	
 	return True
 
-def smart_order(side, qty, symbol=ordersym):
+def smart_order(side, qty, symbol=ordersym, close=False):
 	bid, ask, last = get_bidasklast()
 	
 	ocoorders = []
@@ -316,18 +350,52 @@ def smart_order(side, qty, symbol=ordersym):
 			'text' : ordertext
 			}
 			]}
-	
+	if close:
+		orderObj['orders'][0]['execInst'] += ',Close'
+		orderObj['orders'][1]['execInst'] = 'ReduceOnly'
+
 	result = None
 	apitry = 0
 	while(not result  and apitry < apitrylimit):
 		try:
 		#result = requests.post(bitmex.urls['api'], json = [ limitOrder, stopOrder ])
 			result = bitmex.private_post_order_bulk(orderObj)
+			log.debug(result)
  		except Exception as err:
  			result = None
  			log.warning("Failed to place smart order, trying again")
  			log.warning(err)
- 			time.sleep(apisleep+apitry*2)
+ 			time.sleep(apisleep)
  			apitry = apitry + 1
 
 	return result
+
+def get_balance_total():
+	balanceinfo = None
+	apitry = 0
+	while not balanceinfo and apitry < apitrylimit:
+		try:
+			balanceinfo = bitmex.fetch_balance()
+		except Exception as err:
+			balanceinfo = None
+			log.warning("Failed to get balance, trying again")
+			log.warning(err)
+			time.sleep(apisleep)
+			apitry = apitry + 1
+
+	return balanceinfo['total']['BTC']
+
+def get_balance_free():
+	balanceinfo = None
+	apitry = 0
+	while not balanceinfo and apitry < apitrylimit:
+		try:
+			balanceinfo = bitmex.fetch_balance()
+		except Exception as err:
+			balanceinfo = None
+			log.warning("Failed to get balance, trying again")
+			log.warning(err)
+			time.sleep(apisleep)
+			apitry = apitry + 1
+
+	return balanceinfo['free']['BTC']
