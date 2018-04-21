@@ -17,3 +17,9 @@ twilio_conf = {
 logfiles = { 'main' : 'main.log',
 		'debug' : 'debug.log'
 		}
+
+ordersize = 100
+
+# stoploss and take-profit thresholds for bracket in %
+sl = 5
+tp = 3
