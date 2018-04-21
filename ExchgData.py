@@ -40,7 +40,7 @@ class ExchgData:
 			'ts': 0
 			}
 
-	def __init__(self, exchange, symbol = u'BTC/USD'):
+	def __init__(self, exchange, symbol = u'BTC/USD', logfile='full.log'):
 		if exchange in self.known_exchanges:
 			if exchange == 'bfx':
 				self.exchange = ccxt.bitfinex2({
@@ -51,7 +51,7 @@ class ExchgData:
 		self.logger = logging.getLogger(__name__+'.ExchgData')
 		self.logger.setLevel(logging.DEBUG)
 		sh = logging.StreamHandler()
-		dh = logging.FileHandler('full.log')
+		dh = logging.FileHandler(logfile)
 		sh.setLevel(logging.INFO)
 		dh.setLevel(logging.DEBUG)
 		fm = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
@@ -90,6 +90,10 @@ class ExchgData:
 				self.debug(error)
 				time.sleep(self.apitrysleep+apitry*2)
 				apitry = apitry+1
+		self.debug("Last candle ts: %s" % utilities.ts2label(rawdata[-1][0]))
+	# 	if time.time()*1000 - rawdata[-1][0] < self.tf_seconds[tf]:
+	# 		self.debug("Last candle is not complete with ts %s, dropping" % utilities.ts2label(rawdata[-1][0]))
+
 		self.debug("Fetched %d candles" % len(rawdata))
 		if(len(rawdata) < limit-1):
 			self.logger.debug("Asked for %d candles but received %d" % (limit, len(rawdata)))
@@ -129,25 +133,34 @@ class ExchgData:
 			self.debug("Lag is %d" % lag)
 			currlen = len(self.candles[tf])
 			self.debug("current length for tf %s is %d" % (tf, currlen))
+			
+			candles = self.fetch_candles(tf, start=((time.time() - (lag+self.tf_seconds[tf]))*1000))
+			self.debug("Candles length is %d" % len(candles))
 			if lag > self.tf_seconds[tf]:
-
 				self.debug("Fetching fresh data for lag %d greater than %d" % (lag, self.tf_seconds[tf]))
-				candles = self.fetch_candles(tf, start=(time.time() - lag)*1000)
-				self.debug("Candles length is %d" % len(candles))
 				it = 0
-				while it < len(candles) and candles[it][0] <= last_ts:
+				while it < len(candles) and candles[it][0] < last_ts:
 					self.debug("it %d, ts %d" % (it, candles[it][0]))
 					it = it + 1
 
 				if it < len(candles):
+					self.debug("Old candles last ts now %s" % utilities.ts2label(self.get_last_ts(tf)))
+					self.candles[tf] = self.candles[tf][-currlen:-1]
+					self.debug("Old candles last ts now %s" % utilities.ts2label(self.get_last_ts(tf)))
 					self.candles[tf].extend(candles[it:])
-					
+					self.debug("Old candles last tses now %s, %s" % (utilities.ts2label(self.candles[tf][-2][0]), utilities.ts2label(self.get_last_ts(tf))))
 					trimlength = currlen
 					if(lookback > trimlength):
 						trimlength = lookback
 					self.debug("Resizing candles to %d" % trimlength)
 					self.candles[tf] = self.candles[tf][-trimlength:] # prevent indefinite expansion
 				self.debug("New last timestamp is %d" % self.get_last_ts(tf))
+			else:
+				self.candles[tf] = self.candles[tf][-currlen:-1]
+				self.debug("Old candles last ts now %s" % utilities.ts2label(self.get_last_ts(tf)))
+				self.debug("Refreshing last candle for lag %d less than %d" % (lag, self.tf_seconds[tf]))
+				self.candles[tf].append(candles[-1])
+				self.debug("Update candles last ts now %s" % utilities.ts2label(self.get_last_ts(tf)))
 
 	def get_candles(self, tf, lookback):
 		# if not tf in self.candles.keys() or len(self.candles[tf]) < lookback:
@@ -274,3 +287,10 @@ class ExchgData:
 
 	def get_book(self):
 		return self.book
+
+	def dprint_last_candles(self, tf, lookback):
+		if lookback > len(self.candles[tf]):
+			lookback = len(self.candles[tf])
+		for ts in range(-lookback, 0):
+			candle = self.candles[tf][ts]
+			self.debug("CANDLES(%s), T: %s, O: %.2f, H: %2.f, L: %.2f, C: %.2f, V: %.2f" % (tf, utilities.ts2label(candle[0]), candle[1], candle[2], candle[3], candle[4], candle[5]))
