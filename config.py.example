@@ -14,3 +14,6 @@ twilio_conf = {
 	'msgprefix' : '[BOT]'
 	}
 
+logfiles = { 'main' : 'main.log',
+		'debug' : 'debug.log'
+		}
