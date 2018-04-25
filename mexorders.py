@@ -167,7 +167,7 @@ def market_stop_close(side, qty, price, symbol = ordersym, params=None):
 			apitry = apitry+1
 	return orderdata
 
-def limit_order(side, qty, price, params=None, symbol=ordersym):
+def limit_order(side, qty, price, symbol=ordersym, params=None ):
 	orderdata = None
 	apitry = 0
 	while not orderdata and apitry < apitrylimit:
@@ -185,7 +185,7 @@ def limit_close(side, qty, price, symbol = ordersym, params = None):
 	if(params):
 		myparams.update(params)
 			
-        orderdata = limit_order(side, qty, price, params=myparams, symbol=symbol)
+        orderdata = limit_order(side, qty, price, symbol=symbol, params=myparams)
         return orderdata
 
 def limit_buy(qty, price, symbol = ordersym, params=None):
