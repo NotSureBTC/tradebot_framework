@@ -218,7 +218,7 @@ def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=N
 	apitry = 0
 	while not neworder and apitry < apitrylimit:
 		try:
-			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=params)
+			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=price, params=params)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
 			log.info("Failed to edit order, will try again shortly")
 			log.warning(error)
