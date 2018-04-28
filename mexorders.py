@@ -356,7 +356,7 @@ def smart_order(side, qty, symbol=ordersym, close=False):
 
 	result = None
 	apitry = 0
-	while(not result  and apitry < apitrylimit):
+	while(not result  and apitry < apitrylimit*10):
 		try:
 		#result = requests.post(bitmex.urls['api'], json = [ limitOrder, stopOrder ])
 			result = bitmex.private_post_order_bulk(orderObj)
@@ -365,7 +365,7 @@ def smart_order(side, qty, symbol=ordersym, close=False):
  			result = None
  			log.warning("Failed to place smart order, trying again")
  			log.warning(err)
- 			time.sleep(apisleep)
+ 			time.sleep(0.1)
  			apitry = apitry + 1
 
 	return result
