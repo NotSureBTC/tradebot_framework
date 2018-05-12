@@ -67,14 +67,15 @@ def market_sell(qty, symbol = ordersym):
 	return market_order('sell', qty, symbol)
 
 def get_positions():
-	positions = []
+	positions = None
 	apitry = 0
-	while(not positions and apitry < apitrylimit):
+	while(positions == None and apitry < apitrylimit):
 		try:
 			positions = bitmex.private_get_position()
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
 			time.sleep(apisleep)
 			apitry = apitry + 1
+	
 	return positions
 
 def get_open_orders(symbol = ordersym):
@@ -206,12 +207,14 @@ def cancel_order(orderid):
 	return response
 
 def cancel_open_orders(symbol = ordersym, text=None):
+	orders = []
 	for order in get_open_orders():
 		if(order['symbol'] != symbol):
 			continue
 		if(text and not text in order['info']['text']):
 			continue
-		return cancel_order(order['id'])
+		orders.append(cancel_order(order['id']))
+	return orders
 
 def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=None):
 	neworder = None
