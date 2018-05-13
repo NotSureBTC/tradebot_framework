@@ -52,15 +52,15 @@ def report_trade(action, ordersize, stacked, price):
 	send_sms(report_string)
 
 
-def m15hist_positive(exchgdata):
-	# m15 for the div detection
-	(t, o, h, l, c, v) = exchgdata.get_split_tohlcv('15m', 34)
-	exchgdata.dprint_last_candles('15m', 5)
-	(m15kvo, m15signal) = klinger_kama(h, l, c, v)
-	m15hist = m15kvo[-1] - m15signal[-1]
-	log.info("m15hist is %.2f" % m15hist)	
+def hist_positive(exchgdata, tf):
+	#  for the div detection
+	(t, o, h, l, c, v) = exchgdata.get_split_tohlcv(tf, 34)
+	exchgdata.dprint_last_candles(tf, 5)
+	(kvo, signal) = klinger_kama(h, l, c, v)
+	hist = kvo[-1] - signal[-1]
+	log.info("hist is %.2f" % hist)	
 	positive = True
-	if m15hist <= 0:
+	if hist <= 0:
 		positive = False
 	return positive
 
@@ -68,34 +68,38 @@ sleeptime = 30
 
 send_sms('Trading Bot Active!')		
 
+# set timeframe here
+hist_tf = '15m' # good for testing
+#hist_tf = '3h' # more likely to actually make money
+
 # main loop
 bfxdata = ExchgData.ExchgData('bfx')
 
-last_hist_positive = m15hist_positive(bfxdata)
-hist_positive = last_hist_positive
+last_hist_positive = hist_positive(bfxdata, hist_tf)
+curr_hist_positive = last_hist_positive
 
 while [ 1 ]:
 	log.debug("Main loop")
 	mexorders.update_bracket_pct(config.sl, config.tp)
 
-	hist_positive = m15hist_positive(bfxdata)
+	curr_hist_positive = hist_positive(bfxdata, hist_tf)
 
 	shorts = mexorders.get_position_size('short')
 	longs = mexorders.get_position_size('long')
 	(bid, ask, last) = mexorders.get_bidasklast()
 	# if h3 kvo has flipped, flip positions
-	if hist_positive and not last_hist_positive:
+	if curr_hist_positive and not last_hist_positive:
 		mexorders.cancel_open_orders()
 		time.sleep(1)
 		mexorders.smart_order('Buy', shorts+config.ordersize)
 		report_trade("GOING LONG", shorts+config.ordersize, longs+config.ordersize, last)
-	elif not hist_positive and last_hist_positive:
+	elif not curr_hist_positive and last_hist_positive:
 		mexorders.cancel_open_orders()
 		time.sleep(1)
 		mexorders.smart_order('Sell', longs+config.ordersize)
 		report_trade("GOING SHORT", longs+config.ordersize, shorts+config.ordersize, last)
 
-	last_hist_positive = hist_positive
+	last_hist_positive = curr_hist_positive
 
 	# now print some status info
 	mexorders.print_positions()
