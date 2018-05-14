@@ -251,7 +251,7 @@ def create_or_update_order(ordertype, side, newamount, price=None, symbol=orders
 		elif(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and orderfound):
 			# once found one, close any others
 			cancel_order(order['id'])
-			log.debug("Canceling order %d" % order['id'])
+			log.debug("Canceling order %s" % order['id'])
 	if(not orderfound):
 		if(ordertype == 'limit'):
 			neworder = limit_close(side, newamount, price, symbol, params=params)
@@ -282,7 +282,16 @@ def add_to_order(ordertype, side, addamount, price=None, pos_symbol=possym, orde
 	return create_or_update_order(ordertype, side, currentsize+addamount, price, ordersym)
 
 def get_bidasklast(symbol = ordersym):
-	ticker = bitmex.fetch_ticker(symbol)
+	ticker = None
+	apitry = 0
+	while not ticker and apitry < apitrylimit: 
+		try:
+			ticker = bitmex.fetch_ticker(symbol)
+		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
+			log.info("Failed to fetch ticker, will try again shortly")
+			log.warning(error)
+			time.sleep(apisleep)
+			apitry = apitry+1
 	return (ticker['bid'], ticker['ask'], ticker['last'])
 
 def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
