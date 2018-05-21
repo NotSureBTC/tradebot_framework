@@ -12,6 +12,8 @@ from config import bitmex_auth
 from config import bitmex_test
 from config import logfiles
 
+from notifications import send_sms
+
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -395,7 +397,11 @@ def get_balance_total():
 			time.sleep(apisleep)
 			apitry = apitry + 1
 
-	return balanceinfo['total']['BTC']
+	if apitry == apitrylimit:
+		send_sms("Failed to get balance, API tries exhausted!")
+		return 0
+	else:
+		return balanceinfo['total']['BTC']
 
 def get_balance_free():
 	balanceinfo = None
