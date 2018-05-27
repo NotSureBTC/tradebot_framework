@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function, division, unicode_literals
 import math
@@ -9,18 +9,18 @@ from time import localtime, mktime
 from utilities import *
 
 def alma( data, window, offset, sigma ):
-	m = math.floor((float(offset) * (window - 1)))
-	s = float(window)/float(sigma)
-        almaseries = []
-	for idata in range(0, len(data)-window):
-		wtdsum = 0
-	     	cumwt = 0
-	     	for k in range(0,window-1):
-			wtd = math.exp(-((k-m)*(k-m))/(2*s*s))
-			wtdsum = wtdsum + wtd * data[idata+window-1-k]
-			cumwt = cumwt + wtd
-	        almaseries.append(wtdsum / cumwt)
-	return almaseries
+    m = math.floor((float(offset) * (window - 1)))
+    s = float(window)/float(sigma)
+    almaseries = []
+    for idata in range(0, len(data)-window):
+        wtdsum = 0
+        cumwt = 0
+        for k in range(0,window-1):
+            wtd = math.exp(-((k-m)*(k-m))/(2*s*s))
+            wtdsum = wtdsum + wtd * data[idata+window-1-k]
+            cumwt = cumwt + wtd
+            almaseries.append(wtdsum / cumwt)
+    return almaseries
 
 def alma_ox_cross( ohlcv, window, offset, sigma ):
 	diff = None

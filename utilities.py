@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from __future__ import print_function, division, unicode_literals
 from time import localtime
@@ -8,7 +8,7 @@ from time import sleep
 
 import json
 import requests
-from StringIO import StringIO
+from io import StringIO
 
 import logging
 log = logging.getLogger(__name__)

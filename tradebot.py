@@ -5,6 +5,7 @@ import time
 import logging
 #logging.basicConfig(level=logging.INFO)
 import mexorders
+import mexsocket
 from indicators import *
 from notifications import send_sms
 from utilities import *
@@ -86,7 +87,7 @@ while [ 1 ]:
 
 	shorts = mexorders.get_position_size('short')
 	longs = mexorders.get_position_size('long')
-	(bid, ask, last) = mexorders.get_bidasklast()
+	(bid, ask, last) = mexsocket.get_wsbidasklast()
 	# if h3 kvo has flipped, flip positions
 	if curr_hist_positive and not last_hist_positive:
 		mexorders.cancel_open_orders()

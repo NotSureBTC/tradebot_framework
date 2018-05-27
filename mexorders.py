@@ -12,8 +12,6 @@ from config import bitmex_auth
 from config import bitmex_test
 from config import logfiles
 
-from notifications import send_sms
-
 import logging
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -43,6 +41,7 @@ if(bitmex_test):
 
 ordersym = u'BTC/USD'
 possym = u'XBTUSD'
+upossym = u'XBTU18'
 
 orders = []
 
@@ -69,15 +68,14 @@ def market_sell(qty, symbol = ordersym):
 	return market_order('sell', qty, symbol)
 
 def get_positions():
-	positions = None
+	positions = []
 	apitry = 0
-	while(positions == None and apitry < apitrylimit):
+	while(not positions and apitry < apitrylimit):
 		try:
 			positions = bitmex.private_get_position()
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
 			time.sleep(apisleep)
 			apitry = apitry + 1
-	
 	return positions
 
 def get_open_orders(symbol = ordersym):
@@ -170,7 +168,7 @@ def market_stop_close(side, qty, price, symbol = ordersym, params=None):
 			apitry = apitry+1
 	return orderdata
 
-def limit_order(side, qty, price, symbol=ordersym, params=None ):
+def limit_order(side, qty, price, params=None, symbol=ordersym):
 	orderdata = None
 	apitry = 0
 	while not orderdata and apitry < apitrylimit:
@@ -184,11 +182,11 @@ def limit_order(side, qty, price, symbol=ordersym, params=None ):
 	return orderdata
 
 def limit_close(side, qty, price, symbol = ordersym, params = None):
-	myparams = { 'execInst': 'ReduceOnly' }
-	if(params):
-		myparams.update(params)
-			
-        orderdata = limit_order(side, qty, price, symbol=symbol, params=myparams)
+    myparams = { 'execInst': 'ReduceOnly' }
+    if(params):
+        myparams.update(params)
+
+        orderdata = limit_order(side, qty, price, params=myparams, symbol=symbol)
         return orderdata
 
 def limit_buy(qty, price, symbol = ordersym, params=None):
@@ -209,21 +207,19 @@ def cancel_order(orderid):
 	return response
 
 def cancel_open_orders(symbol = ordersym, text=None):
-	orders = []
 	for order in get_open_orders():
 		if(order['symbol'] != symbol):
 			continue
 		if(text and not text in order['info']['text']):
 			continue
-		orders.append(cancel_order(order['id']))
-	return orders
+		return cancel_order(order['id'])
 
 def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=None):
 	neworder = None
 	apitry = 0
 	while not neworder and apitry < apitrylimit:
 		try:
-			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=price, params=params)
+			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=params)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
 			log.info("Failed to edit order, will try again shortly")
 			log.warning(error)
@@ -284,18 +280,27 @@ def add_to_order(ordertype, side, addamount, price=None, pos_symbol=possym, orde
 	return create_or_update_order(ordertype, side, currentsize+addamount, price, ordersym)
 
 def get_bidasklast(symbol = ordersym):
-	ticker = None
-	apitry = 0
-	while not ticker and apitry < apitrylimit: 
-		try:
-			ticker = bitmex.fetch_ticker(symbol)
-		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
-			log.info("Failed to fetch ticker, will try again shortly")
-			log.warning(error)
-			time.sleep(apisleep)
-			apitry = apitry+1
+	ticker = bitmex.fetch_ticker(symbol)
 	return (ticker['bid'], ticker['ask'], ticker['last'])
-
+"""
+def perp_update_bracket_pct(sl, tp, amt, pos_symbol=possym, order_symbol=ordersym):
+	slpct = sl/100.
+	tppct = tp/100.
+	ordertxt = 'bracket'
+	myparams = { 'text' : ordertxt }
+	my_positions = get_positions()
+      rawqty = position['currentQty']
+	symbol = position['symbol']
+	price = position['avgCostPrice']
+	slprice = price
+	tpprice = price
+	slprice = price-price*slpct
+	tpprice = price+price*tppct 
+     create_or_update_order('limit', 'sell', amt, tpprice, order_symbol, params=myparams)
+	create_or_update_order('limit', 'buy', -amt, tpprice, order_symbol, params=myparams)
+	
+	return True
+"""
 def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
 	slpct = sl/100.
 	tppct = tp/100.
@@ -311,12 +316,42 @@ def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
 		if(abs(rawqty) > 0 and symbol == pos_symbol):
 			if(rawqty > 0):
 				slprice = price-price*slpct
-				tpprice = price+price*slpct
+				tpprice = price+price*tppct
 				create_or_update_order('limit', 'sell', rawqty, tpprice, order_symbol, params=myparams)
 				create_or_update_order('stop', 'sell', rawqty, slprice, order_symbol, params=myparams)
 			else:
 				slprice = price+price*slpct
-				tpprice = price-price*slpct
+				tpprice = price-price*tppct
+				create_or_update_order('limit', 'buy', -rawqty, tpprice, order_symbol, params=myparams)
+				create_or_update_order('stop', 'buy', -rawqty, slprice, order_symbol, params=myparams)
+	if(len(my_positions) == 0 or (len(my_positions) == 1 and my_positions[0]['currentQty'] == 0)):
+		cancel_open_orders(text=ordertxt)
+	
+	return True
+
+def update_bracket_pct_dolores(sll, tpl,sls,tps, pos_symbol=possym, order_symbol=ordersym):
+	sllpct = sll/100.
+	tplpct = tpl/100.
+	slspct = sls/100.
+	tpspct = tps/100.
+	ordertxt = 'bracket'
+	myparams = { 'text' : ordertxt }
+	my_positions = get_positions()
+	for position in my_positions:
+		rawqty = position['currentQty']
+		symbol = position['symbol']
+		price = position['avgCostPrice']
+		slprice = price
+		tpprice = price
+		if(abs(rawqty) > 0 and symbol == pos_symbol):
+			if(rawqty > 0):
+				slprice = price-price*sllpct
+				tpprice = price+price*tplpct
+				create_or_update_order('limit', 'sell', rawqty, tpprice, order_symbol, params=myparams)
+				create_or_update_order('stop', 'sell', rawqty, slprice, order_symbol, params=myparams)
+			else:
+				slprice = price+price*slspct
+				tpprice = price-price*tpspct
 				create_or_update_order('limit', 'buy', -rawqty, tpprice, order_symbol, params=myparams)
 				create_or_update_order('stop', 'buy', -rawqty, slprice, order_symbol, params=myparams)
 	if(len(my_positions) == 0 or (len(my_positions) == 1 and my_positions[0]['currentQty'] == 0)):
@@ -325,64 +360,64 @@ def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
 	return True
 
 def smart_order(side, qty, symbol=ordersym, close=False):
-	bid, ask, last = get_bidasklast()
-	
-	ocoorders = []
-	# if bid is 7000 ask is 7005
-	# to buy, bid 7004.5, hope it moves down
-	# if next trade moves up, market buy
-	if side == 'Buy':
-		limitprice = ask - 1 
-		stopprice = ask + 2.
-	if side == 'Sell':
-		limitprice = bid + 1
-		stopprice = bid - 2.
+    bid, ask, last = get_bidasklast()
 
-	#print "bid %f, ask %f, last %f, limit %f, stop %f" % (bid, ask, last, limitprice, stopprice)
+    ocoorders = []
+    # if bid is 7000 ask is 7005
+    # to buy, bid 7004.5, hope it moves down
+    # if next trade moves up, market buy
+    if side == 'Buy':
+        limitprice = ask - 1 
+        stopprice = ask + 2.
+    if side == 'Sell':
+        limitprice = bid + 1
+        stopprice = bid - 2.
 
-	ocoid = uid().hex
-	ordertext = 'smart_order'
-	orderObj = {
-		'orders' : [{
-			'clOrdLinkID' : ocoid,
-			'contingencyType' : 'OneCancelsTheOther',
-			'symbol' : possym,
-			'ordType' : 'Stop',
-			'side' : side,
-			'stopPx' : stopprice,
-			'orderQty' : qty,
-			'text' : ordertext,
-			'execInst' : 'LastPrice'
-			},{
-			'clOrdLinkID' : ocoid,
-			'contingencyType' : 'OneCancelsTheOther',
-			'symbol' : possym,
-			'ordType' : 'Limit',
-			'side' : side,
-			'price' : limitprice,
-			'orderQty' : qty,
-			'text' : ordertext
-			}
-			]}
-	if close:
-		orderObj['orders'][0]['execInst'] += ',Close'
-		orderObj['orders'][1]['execInst'] = 'ReduceOnly'
+    #print "bid %f, ask %f, last %f, limit %f, stop %f" % (bid, ask, last, limitprice, stopprice)
 
-	result = None
-	apitry = 0
-	while(not result  and apitry < apitrylimit*10):
-		try:
-		#result = requests.post(bitmex.urls['api'], json = [ limitOrder, stopOrder ])
-			result = bitmex.private_post_order_bulk(orderObj)
-			log.debug(result)
- 		except Exception as err:
- 			result = None
- 			log.warning("Failed to place smart order, trying again")
- 			log.warning(err)
- 			time.sleep(0.1)
- 			apitry = apitry + 1
+    ocoid = uid().hex
+    ordertext = 'smart_order'
+    orderObj = {
+            'orders' : [{
+                    'clOrdLinkID' : ocoid,
+                    'contingencyType' : 'OneCancelsTheOther',
+                    'symbol' : possym,
+                    'ordType' : 'Stop',
+                    'side' : side,
+                    'stopPx' : stopprice,
+                    'orderQty' : qty,
+                    'text' : ordertext,
+                    'execInst' : 'LastPrice'
+                    },{
+                    'clOrdLinkID' : ocoid,
+                    'contingencyType' : 'OneCancelsTheOther',
+                    'symbol' : possym,
+                    'ordType' : 'Limit',
+                    'side' : side,
+                    'price' : limitprice,
+                    'orderQty' : qty,
+                    'text' : ordertext
+                    }
+                    ]}
+    if close:
+        orderObj['orders'][0]['execInst'] += ',Close'
+        orderObj['orders'][1]['execInst'] = 'ReduceOnly'
 
-	return result
+    result = None
+    apitry = 0
+    while(not result  and apitry < apitrylimit):
+        try:
+            #result = requests.post(bitmex.urls['api'], json = [ limitOrder, stopOrder ])
+            result = bitmex.private_post_order_bulk(orderObj)
+            log.debug(result)
+        except Exception as err:
+            result = None
+            log.warning("Failed to place smart order, trying again")
+            log.warning(err)
+            time.sleep(apisleep)
+            apitry = apitry + 1
+    
+    return result
 
 def get_balance_total():
 	balanceinfo = None
@@ -397,11 +432,7 @@ def get_balance_total():
 			time.sleep(apisleep)
 			apitry = apitry + 1
 
-	if apitry == apitrylimit:
-		send_sms("Failed to get balance, API tries exhausted!")
-		return 0
-	else:
-		return balanceinfo['total']['BTC']
+	return balanceinfo['total']['BTC']
 
 def get_balance_free():
 	balanceinfo = None
