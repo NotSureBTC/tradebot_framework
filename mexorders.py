@@ -6,6 +6,7 @@ import time
 import math
 import requests
 import json
+import mexsocket
 
 from uuid import uuid4 as uid
 from config import bitmex_auth
@@ -360,7 +361,7 @@ def update_bracket_pct_dolores(sll, tpl,sls,tps, pos_symbol=possym, order_symbol
 	return True
 
 def smart_order(side, qty, symbol=ordersym, close=False):
-    bid, ask, last = get_bidasklast()
+    (bid, ask, last) = mexsocket.get_wsbidasklast()
 
     ocoorders = []
     # if bid is 7000 ask is 7005
