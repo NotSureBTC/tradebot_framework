@@ -19,3 +19,8 @@ ws = BitMEXWebsocket(endpoint=ep,symbol=ordersym, api_key=config.bitmex_auth['ap
 def get_wsbidasklast():
     ticker=ws.get_instrument()
     return(ticker['bidPrice'],ticker['askPrice'],ticker['lastPrice'])
+    
+
+def get_wsopen_orders(symbol = ordersym):
+    oorders = ws.open_orders('')
+    return oorders

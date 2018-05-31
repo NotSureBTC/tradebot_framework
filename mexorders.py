@@ -108,17 +108,25 @@ def get_stoppx(order):
 				rvalue = value
 	return rvalue
 
+def get_wsstoppx(order):
+	rvalue = None
+	if order['orderType'] == 'Stop':
+		for key, value in order:
+			if key == 'stopPx':
+				rvalue = value
+	return rvalue
+
 def print_open_orders():
 	#logmesg = "Amount\tPrice\tSide\tType\tText\n"
 	orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
 	price = 0.0
-	for order in get_open_orders():
-		if(order['type'] == 'stop'):
-			price = get_stoppx(order)
+	for order in mexsocket.get_wsopen_orders():
+		if(order['ordType'] == 'Stop'):
+			price = get_wsstoppx(order)
 		else:
 			price = order['price']
 		#logmesg = logmesg+ str(order['amount'])+"\t"+str(price)+"\t"+order['side']+"\t"+order['type']+"\t"+order['info']['text']+"\n"
-		log.info(orderstring % ( order['amount'], price, order['side'], order['type'], order['info']['text']))
+		log.info(orderstring % ( order['orderQty'], price, order['side'], order['ordType'], order['text']))
 
 def market_close_all(pos_symbol = possym, order_symbol = ordersym):
 	close_longs(pos_symbol, order_symbol)
@@ -208,7 +216,7 @@ def cancel_order(orderid):
 	return response
 
 def cancel_open_orders(symbol = ordersym, text=None):
-	for order in get_open_orders():
+	for order in mexsocket.get_wsopen_orders():
 		if(order['symbol'] != symbol):
 			continue
 		if(text and not text in order['info']['text']):
@@ -236,7 +244,7 @@ def create_or_update_order(ordertype, side, newamount, price=None, symbol=orders
 		ordertext = params['text']
 	if(price):
 		price = math.floor(price)
-	for order in get_open_orders():
+	for order in mexsocket.get_wsopen_orders():
 		if(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and not orderfound):
 			if(order['type'] == 'stop'):
 				params.update({'stopPx': price, 'execInst': 'Close' })
