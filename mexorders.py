@@ -6,7 +6,8 @@ import time
 import math
 import requests
 import json
-import mexsocket
+from bitmex_websocket import BitMEXWebsocket
+
 
 from uuid import uuid4 as uid
 from config import bitmex_auth
@@ -35,6 +36,7 @@ log.info("Logger initialized")
 
 apitrylimit = 20
 apisleep = 1
+socketsleep = 90
 
 bitmex = ccxt.bitmex(bitmex_auth)
 if(bitmex_test):
@@ -45,6 +47,31 @@ possym = u'XBTUSD'
 upossym = u'XBTU18'
 
 orders = []
+
+def run_websocket(ordersym = 'XBTUSD',key = bitmex_auth['apiKey'],secret = bitmex_auth['secret'],test=bitmex_test):
+    if test==False:
+        ep="https://www.bitmex.com/api/v1"
+    else:
+        ep="https://testnet.bitmex.com/api/v1"
+    ws = BitMEXWebsocket(endpoint=ep,symbol=ordersym, api_key=key, api_secret=secret)
+    return(ws)
+    
+ws=run_websocket()
+
+def get_wsbidasklast():
+    global ws
+    apitry = 0
+    ticker = []
+    while not ticker and apitry<apitrylimit:
+        try:
+            ticker=ws.get_instrument()
+        except:
+            print("shitwhatthefuckbidasklast")
+            time.sleep(socketsleep)
+            apitry=apitry+1
+            ws = run_websocket
+    return(ticker['bidPrice'],ticker['askPrice'],ticker['lastPrice'])
+    
 
 def market_order(side, qty, symbol = ordersym):
 	orderdata = None
@@ -110,23 +137,24 @@ def get_stoppx(order):
 
 def get_wsstoppx(order):
 	rvalue = None
-	if order['orderType'] == 'Stop':
-		for key, value in order:
+	if order['ordType'] == 'Stop':
+		for key, value in order.items():
 			if key == 'stopPx':
 				rvalue = value
 	return rvalue
 
 def print_open_orders():
-	#logmesg = "Amount\tPrice\tSide\tType\tText\n"
-	orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
-	price = 0.0
-	for order in mexsocket.get_wsopen_orders():
-		if(order['ordType'] == 'Stop'):
-			price = get_wsstoppx(order)
-		else:
-			price = order['price']
-		#logmesg = logmesg+ str(order['amount'])+"\t"+str(price)+"\t"+order['side']+"\t"+order['type']+"\t"+order['info']['text']+"\n"
-		log.info(orderstring % ( order['orderQty'], price, order['side'], order['ordType'], order['text']))
+    #logmesg = "Amount\tPrice\tSide\tType\tText\n"
+    orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
+    price = 0.0
+    if get_open_orders() is not None:
+        for order in get_open_orders():
+            if(order['type'] == 'stop'):
+                price = get_stoppx(order)
+            else:
+                price = order['price']
+                #logmesg = logmesg+ str(order['amount'])+"\t"+str(price)+"\t"+order['side']+"\t"+order['type']+"\t"+order['info']['text']+"\n"
+            log.info(orderstring % ( order['info']['orderQty'], price, order['side'], order['info']['ordType'], order['info']['text']))
 
 def market_close_all(pos_symbol = possym, order_symbol = ordersym):
 	close_longs(pos_symbol, order_symbol)
@@ -216,12 +244,13 @@ def cancel_order(orderid):
 	return response
 
 def cancel_open_orders(symbol = ordersym, text=None):
-	for order in mexsocket.get_wsopen_orders():
-		if(order['symbol'] != symbol):
-			continue
-		if(text and not text in order['info']['text']):
-			continue
-		return cancel_order(order['id'])
+    if get_open_orders() is not None:
+        for order in get_open_orders():
+            if(order['symbol'] != symbol):
+                continue
+            if(text and not text in order['info']['text']):
+                continue
+            return cancel_order(order['id'])
 
 def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=None):
 	neworder = None
@@ -237,34 +266,35 @@ def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=N
 	return neworder
 
 def create_or_update_order(ordertype, side, newamount, price=None, symbol=ordersym, params=None):
-	neworder = None
-	orderfound = False
-	ordertext = None
-	if params and 'text' in params.keys():
-		ordertext = params['text']
-	if(price):
-		price = math.floor(price)
-	for order in mexsocket.get_wsopen_orders():
-		if(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and not orderfound):
-			if(order['type'] == 'stop'):
-				params.update({'stopPx': price, 'execInst': 'Close' })
-				neworder = edit_order(order['id'], symbol, ordertype, side, newamount, params=params) 
-				orderfound = True
-				log.debug("Updating order %s" % order['id'])
-			else:
-				neworder = edit_order(order['id'], symbol, ordertype, side, newamount, math.floor(price), params)
-				orderfound = True
-				log.debug("Updating order %s" % order['id'])
-		elif(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and orderfound):
-			# once found one, close any others
-			cancel_order(order['id'])
-			log.debug("Canceling order %s" % order['id'])
-	if(not orderfound):
-		if(ordertype == 'limit'):
-			neworder = limit_close(side, newamount, price, symbol, params=params)
-		elif(ordertype == 'stop'):
-			neworder = market_stop_close(side, newamount, price, symbol, params=params)
-	return neworder
+    neworder = None
+    orderfound = False
+    ordertext = None
+    if params and 'text' in params.keys():
+        ordertext = params['text']
+    if(price):
+        price = math.floor(price)
+    if get_open_orders() is not None: 
+        for order in get_open_orders():
+            if(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and not orderfound):
+                if(order['type'] == 'stop'):
+                    params.update({'stopPx': price, 'execInst': 'Close' })
+                    neworder = edit_order(order['id'], symbol, ordertype, side, newamount, params=params) 
+                    orderfound = True
+                    log.debug("Updating order %s" % order['id'])
+                else:
+                    neworder = edit_order(order['id'], symbol, ordertype, side, newamount, math.floor(price), params)
+                    orderfound = True
+                    log.debug("Updating order %s" % order['id'])
+            elif(order['symbol'] == symbol and order['type'] == ordertype and order['side'] == side and (not ordertext or ordertext in order['info']['text']) and orderfound):
+                # once found one, close any others
+                cancel_order(order['id'])
+                log.debug("Canceling order %s" % order['id'])
+        if(not orderfound):
+            if(ordertype == 'limit'):
+                neworder = limit_close(side, newamount, price, symbol, params=params)
+            elif(ordertype == 'stop'):
+                neworder = market_stop_close(side, newamount, price, symbol, params=params)
+        return neworder
 
 def get_position_size(side, symbol=possym):
 	position_size = 0
@@ -369,7 +399,7 @@ def update_bracket_pct_dolores(sll, tpl,sls,tps, pos_symbol=possym, order_symbol
 	return True
 
 def smart_order(side, qty, symbol=ordersym, close=False):
-    (bid, ask, last) = mexsocket.get_wsbidasklast()
+    (bid, ask, last) = get_wsbidasklast()
 
     ocoorders = []
     # if bid is 7000 ask is 7005
