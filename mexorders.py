@@ -66,7 +66,6 @@ def get_wsbidasklast():
         try:
             ticker=ws.get_instrument()
         except:
-            print("shitwhatthefuckbidasklast")
             time.sleep(socketsleep)
             apitry=apitry+1
             ws = run_websocket
