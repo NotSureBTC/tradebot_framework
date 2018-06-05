@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # coding=utf-8
 from __future__ import print_function
 import time
@@ -86,7 +86,7 @@ while [ 1 ]:
 
 	shorts = mexorders.get_position_size('short')
 	longs = mexorders.get_position_size('long')
-	(bid, ask, last) = mexorders.get_bidasklast()
+	(bid, ask, last) = mexorders.get_wsbidasklast()
 	# if h3 kvo has flipped, flip positions
 	if curr_hist_positive and not last_hist_positive:
 		mexorders.cancel_open_orders()
