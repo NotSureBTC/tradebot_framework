@@ -48,6 +48,12 @@ class ExchgData:
 					'enableRateLimit': True
 					})
 			self.symbol = symbol
+			if exchange == 'bitmex':
+				#self.exchange = ccxt.bitmex({
+				#	'rateLimit': 10000,
+				#	'enableRateLimit': True
+				#	})
+				self.exchange = ccxt.bitmex()
 		self.logger = logging.getLogger(__name__+'.ExchgData')
 		self.logger.setLevel(logging.DEBUG)
 		sh = logging.StreamHandler()
