@@ -49,6 +49,7 @@ orders = []
 def market_order(side, qty, symbol = ordersym):
 	orderdata = None
 	apitry = 0
+	qty = int(round(qty))
 	while not orderdata and apitry < apitrylimit:
 	#for i in range(0, apitrylimit):
 		try:
@@ -94,7 +95,7 @@ def get_open_orders(symbol = ordersym):
 def print_positions():
 	#logmesg = "Symbol\tQty\tEntry\t\tLiq\n"
 
-	orderstring = "POSITION: Symbol: %s\tQty: %d\tEntry: %.2f\tLiq: %.2f"
+	orderstring = "=== POSITION === Symbol: %s\tQty: %d\tEntry: %.2f\tLiq: %.2f"
 	for position in get_positions():
 		if position['currentQty'] != 0:	
 		#logmesg = logmesg + position['symbol']+"\t"+str(position['currentQty'])+"\t"+str(position['avgCostPrice'])+"\t"+str(position['liquidationPrice'])+"\n"
@@ -111,7 +112,8 @@ def get_stoppx(order):
 
 def print_open_orders():
 	#logmesg = "Amount\tPrice\tSide\tType\tText\n"
-	orderstring = "ORDER: Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
+	#orderstring = "=== ORDER === Amount: %d\tPrice: %.2f\tSide: %s\tType: %s\tText: %s"
+	orderstring = "=== ORDER === Amount: %d\tPrice: %.2f\tSide: %s\tType: %s"
 	price = 0.0
 	for order in get_open_orders():
 		if(order['type'] == 'stop'):
@@ -119,7 +121,7 @@ def print_open_orders():
 		else:
 			price = order['price']
 		#logmesg = logmesg+ str(order['amount'])+"\t"+str(price)+"\t"+order['side']+"\t"+order['type']+"\t"+order['info']['text']+"\n"
-		log.info(orderstring % ( order['amount'], price, order['side'], order['type'], order['info']['text']))
+		log.info(orderstring % ( order['amount'], price, order['side'], order['type']))
 
 def market_close_all(pos_symbol = possym, order_symbol = ordersym):
 	close_longs(pos_symbol, order_symbol)
@@ -139,7 +141,7 @@ def close_shorts(pos_symbol = possym, order_symbol = ordersym):
 	for position in positions:
 		if(position['symbol'] == pos_symbol):
 			if(position['currentQty'] < 0):
-				market_buy(position['currentQty'])
+				market_buy(position['currentQty'], order_symbol)
 
 def market_stop(side, qty, price, symbol = ordersym):
 
