@@ -49,12 +49,14 @@ orders = []
 def market_order(side, qty, symbol = ordersym):
 	orderdata = None
 	apitry = 0
-	qty = int(round(qty))
+	qty = abs(int(round(qty)))
+	log.info("Order quantity %d" % qty)
 	while not orderdata and apitry < apitrylimit:
 	#for i in range(0, apitrylimit):
 		try:
 			orderdata = bitmex.create_order(symbol, 'market', side, qty)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
+			log.warning(error)
 			time.sleep(apisleep)
 			apitry = apitry+1
 
@@ -64,10 +66,10 @@ def market_order(side, qty, symbol = ordersym):
 	return orderdata
 
 def market_buy(qty, symbol = ordersym):
-	return market_order('buy', qty, symbol)
+	return market_order('Buy', qty, symbol)
 	
 def market_sell(qty, symbol = ordersym):
-	return market_order('sell', qty, symbol)
+	return market_order('Sell', qty, symbol)
 
 def get_positions():
 	positions = None
