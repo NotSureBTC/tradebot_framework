@@ -34,7 +34,7 @@ log.addHandler(dh)
 log.addHandler(ih)
 log.info("Logger initialized")
 
-apitrylimit = 20
+apitrylimit = 5
 apisleep = 1
 
 bitmex = ccxt.bitmex(bitmex_auth)
@@ -230,7 +230,8 @@ def edit_order(orderid, symbol, ordertype, side, newamount, price=None, params=N
 			neworder = bitmex.edit_order(orderid, symbol, ordertype, side, newamount, price=price, params=params)
 		except (ccxt.ExchangeError, ccxt.DDoSProtection, ccxt.AuthenticationError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as error:
 			log.info("Failed to edit order, will try again shortly")
-			log.warning(error)
+			#log.warning(error)
+			log.info(error)
 			time.sleep(apisleep)
 			apitry = apitry+1
 	return neworder
@@ -315,12 +316,12 @@ def update_bracket_pct(sl, tp, pos_symbol=possym, order_symbol=ordersym):
 		if(abs(rawqty) > 0 and symbol == pos_symbol):
 			if(rawqty > 0):
 				slprice = price-price*slpct
-				tpprice = price+price*slpct
+				tpprice = price+price*tppct
 				create_or_update_order('limit', 'sell', rawqty, tpprice, order_symbol, params=myparams)
 				create_or_update_order('stop', 'sell', rawqty, slprice, order_symbol, params=myparams)
 			else:
 				slprice = price+price*slpct
-				tpprice = price-price*slpct
+				tpprice = price-price*tppct
 				create_or_update_order('limit', 'buy', -rawqty, tpprice, order_symbol, params=myparams)
 				create_or_update_order('stop', 'buy', -rawqty, slprice, order_symbol, params=myparams)
 	if(len(my_positions) == 0 or (len(my_positions) == 1 and my_positions[0]['currentQty'] == 0)):
